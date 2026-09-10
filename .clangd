@@ -1,0 +1,20 @@
+# Mirrors the desktop targets in build.sh.
+# System raylib lives in /usr/include, so no -I is needed here; the vendored
+# copy under vendor/raylib-web is the wasm build and is only for emcc.
+CompileFlags:
+  Compiler: clang++
+  Add:
+    - -std=c++20
+    - -Wall
+    - -Wextra
+    # Uncomment to index the PLATFORM_WEB branches instead of the desktop ones.
+    # - -DPLATFORM_WEB
+    # - -Ivendor/raylib-web/include
+  Remove:
+    # gcc-only flags, in case a compile_commands.json ever feeds these in
+    - -fsanitize=*
+    - -m*
+
+Diagnostics:
+  UnusedIncludes: Strict
+  MissingIncludes: Strict
