@@ -296,14 +296,16 @@ auto gameUpdate(Game *game) -> void {
 
 	for (int i = 0; i < game->thingCount; i++) {
 		Thing &thing = game->things[i];
-		Vector2 move = {};
-		bool hitSomething = testMove(&game->tileMap, thing.position, thing.velocity, &move);
-
-		thing.position += move;
+		// bool hitSomething = testMove(&game->tileMap, thing.position, thing.velocity, &move);
+		int tileValue;
+		bool hitSomething = game->tileMap.tryGetTile(thing.position.x + thing.velocity.x, thing.position.y + thing.velocity.y, &tileValue);
 
 		if (hitSomething) {
 			thing.velocity = thing.velocity * -1;
+			thing.velocity = Vector2Rotate(thing.velocity, GetRandomValue(0, 1) * PI / 4.f);
 		}
+
+		thing.position += thing.velocity;
 	}
 }
 
