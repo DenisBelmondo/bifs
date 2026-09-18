@@ -183,8 +183,18 @@ struct Thing {
 
 struct Game {
 	TileMap tileMap;
+
 	Vector2 playerPosition;
 	float playerAngle;
+	float playerElevation;
+
+	enum {
+		GROUNDED,
+		JUMPING,
+	} playerJumpState;
+
+	float playerJumpT;
+
 	int thingCount;
 	Thing *things;
 };
@@ -281,6 +291,21 @@ auto testRay(const Game *game, Vector2 from, Vector2 to) -> TestRayResult {
 
 auto gameUpdate(Game *game) -> void {
 	// move player
+
+	if (IsKeyDown(KEY_SPACE)) {
+		if (game->playerJumpState == Game::GROUNDED) {
+			game->playerJumpState = Game::JUMPING;
+		}
+	}
+
+	if (game->playerJumpState == Game::JUMPING) {
+		game->playerJumpT = fmin(game->playerJumpT + 0.05f, 1);
+
+		if (game->playerJumpT >= 1) {
+			game->playerJumpState = Game::GROUNDED;
+			game->playerJumpT = 0;
+		}
+	}
 
 	auto turnAxis = (float)IsKeyDown(KEY_RIGHT) - (float)IsKeyDown(KEY_LEFT);
 
@@ -408,6 +433,7 @@ auto main() -> int {
 
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE);
 	InitWindow(640, 400, "Buster Impulse");
+	DisableCursor();
 
 	Model planeModel = LoadModelFromMesh(GenMeshPlane(1000, 1000, 1, 1));
 
@@ -441,6 +467,8 @@ auto main() -> int {
 	double lag = 0;
 
 	while (!WindowShouldClose()) {
+		game.playerAngle -= GetMouseDelta().x / 125.f;
+
 		double newTime = GetTime();
 		double delta = newTime - oldTime;
 
@@ -453,7 +481,7 @@ auto main() -> int {
 		}
 
 		camera.position.x = game.playerPosition.x;
-		camera.position.y = 0.5f;
+		camera.position.y = 0.5f + sinf(game.playerJumpT * PI);
 		camera.position.z = game.playerPosition.y;
 
 		Vector2 playDir = directionOf(game.playerAngle);
