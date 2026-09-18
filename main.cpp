@@ -230,11 +230,21 @@ auto testMove(TileMap *tileMap, Vector2 from, Vector2 relative, Vector2 *outMove
 	return couldMoveAllTheWay;
 }
 
-auto testRay(const Game *game, Vector2 from, Vector2 to, Vector2 *outRayEndPoint, Thing **outThing) -> bool {
+struct TestRayResult {
+	Vector2 endpoint;
+	Thing *thing;
+
+	enum {
+		NOTHING,
+		TILE,
+		THING,
+	} what;
+};
+
+auto testRay(const Game *game, Vector2 from, Vector2 to) -> TestRayResult {
 	static const float STEP_SIZE = 0.1f;
 
-	*outRayEndPoint = to;
-	*outThing = nullptr;
+	TestRayResult rayResult {};
 
 	const Vector2 delta = to - from;
 	const Vector2 direction = Vector2Normalize(delta);
@@ -245,8 +255,9 @@ auto testRay(const Game *game, Vector2 from, Vector2 to, Vector2 *outRayEndPoint
 		const TileMap::GetTileResult result = game->tileMap.tryGetTile(p.x, p.y);
 
 		if (result.isValid()) {
-			*outRayEndPoint = p;
-			return true;
+			rayResult.what = TestRayResult::TILE;
+			rayResult.endpoint = p;
+			return rayResult;
 		}
 
 		for (int i = 0; i < game->thingCount; i++) {
@@ -257,14 +268,15 @@ auto testRay(const Game *game, Vector2 from, Vector2 to, Vector2 *outRayEndPoint
 			}
 
 			if (Vector2Distance(p, thing.position) < thing.radius) {
-				*outRayEndPoint = p;
-				*outThing = &thing;
-				return true;
+				rayResult.what = TestRayResult::THING;
+				rayResult.endpoint = p;
+				rayResult.thing = &thing;
+				return rayResult;
 			}
 		}
 	}
 
-	return false;
+	return rayResult;
 }
 
 auto gameUpdate(Game *game) -> void {
@@ -300,18 +312,13 @@ auto gameUpdate(Game *game) -> void {
 	// kill shit
 
 	if (IsKeyDown(KEY_LEFT_CONTROL)) {
-		Vector2 rayEndPoint;
-		Thing *hitThing = nullptr;
-
-		bool hitSomething = testRay(
+		TestRayResult rayResult = testRay(
 			game,
 			game->playerPosition,
-			game->playerPosition + directionOf(game->playerAngle) * 2.f,
-			&rayEndPoint,
-			&hitThing);
+			game->playerPosition + directionOf(game->playerAngle) * 2.f);
 
-		if (hitSomething && hitThing) {
-			hitThing->isAlive = false;
+		if (rayResult.what == TestRayResult::THING) {
+			rayResult.thing->isAlive = false;
 			puts("yeowch!");
 		}
 	}
