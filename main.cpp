@@ -5,8 +5,8 @@
 #include <stddef.h>
 #include <stdio.h>
 
-template <typename T, size_t N>
-consteval auto arraySize(const T (&array)[N]) -> size_t {
+template <typename T, typename T_SIZE, T_SIZE N>
+consteval auto arraySize(const T (&array)[N]) -> T_SIZE {
 	return sizeof (array) / sizeof (array[0]);
 }
 
@@ -128,27 +128,46 @@ static auto DrawCubeTexture(Texture2D texture, Vector3 position, float width, fl
 }
 
 struct TileMap {
+	struct GetTileResult {
+		enum {
+			FAILURE,
+			SUCCESS	=	1	<<	0,
+			OOB			=	1	<<	1,
+		} code;
+
+		int tileValue;
+
+		inline auto isValid() const {
+			return (code & SUCCESS) != 0;
+		}
+	};
+
 	int *tiles;
 	int width;
 	int height;
 
-	auto tryGetTile(float x, float y, int *outValue) const -> bool {
+	auto tryGetTile(float x, float y) const -> GetTileResult {
+		GetTileResult result {};
+
 		const auto xx = (int)floorf(x + 0.5f);
 		const auto yy = (int)floorf(y + 0.5f);
 		const auto i = yy * width + xx;
 
 		// should probably return something here that signifies oob
 		if (xx < 0 || xx >= width || yy < 0 || yy >= height) {
-			return false;
+			result.code = GetTileResult::FAILURE;
+			return result;
 		}
 
 		int tile = tiles[i];
 
-		if (outValue) {
-			*outValue = tile;
+		result.tileValue = tile;
+		
+		if (tile != 0) {
+			result.code = GetTileResult::SUCCESS;
 		}
 
-		return tile != 0;
+		return result;
 	}
 };
 
@@ -192,12 +211,16 @@ auto testMove(TileMap *tileMap, Vector2 from, Vector2 relative, Vector2 *outMove
 	int tile = 0;
 	bool couldMoveAllTheWay = true;
 
-	if (tileMap->tryGetTile(from.x, testMove.y, &tile) || tile != 0) {
+	TileMap::GetTileResult getTileResult = tileMap->tryGetTile(from.x, testMove.y);
+
+	if (getTileResult.isValid() || tile != 0) {
 		move.y = 0.f;
 		couldMoveAllTheWay = false;
 	}
+	
+	getTileResult = tileMap->tryGetTile(testMove.x, from.y);
 
-	if (tileMap->tryGetTile(testMove.x, from.y, &tile) || tile != 0) {
+	if (getTileResult.isValid() || tile != 0) {
 		move.x = 0.f;
 		couldMoveAllTheWay = false;
 	}
@@ -219,8 +242,9 @@ auto testRay(const Game *game, Vector2 from, Vector2 to, Vector2 *outRayEndPoint
 
 	for (float t = 0; t <= distance; t += STEP_SIZE) {
 		const Vector2 p = from + direction * t;
+		const TileMap::GetTileResult result = game->tileMap.tryGetTile(p.x, p.y);
 
-		if (game->tileMap.tryGetTile(p.x, p.y, nullptr)) {
+		if (result.isValid()) {
 			*outRayEndPoint = p;
 			return true;
 		}
@@ -297,10 +321,9 @@ auto gameUpdate(Game *game) -> void {
 	for (int i = 0; i < game->thingCount; i++) {
 		Thing &thing = game->things[i];
 		// bool hitSomething = testMove(&game->tileMap, thing.position, thing.velocity, &move);
-		int tileValue;
-		bool hitSomething = game->tileMap.tryGetTile(thing.position.x + thing.velocity.x, thing.position.y + thing.velocity.y, &tileValue);
+		TileMap::GetTileResult result = game->tileMap.tryGetTile(thing.position.x + thing.velocity.x, thing.position.y + thing.velocity.y);
 
-		if (hitSomething) {
+		if (result.isValid()) {
 			thing.velocity = thing.velocity * -1;
 			thing.velocity = Vector2Rotate(thing.velocity, GetRandomValue(0, 1) * PI / 4.f);
 		}
